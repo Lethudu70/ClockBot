@@ -10,7 +10,11 @@ from keep_alive import run
 run()  # Démarre le serveur Flask en arrière-plan
 
 # --- Read token from environment variable ---
-TOKEN = os.environ.get("DISCORD_TOKEN")  # Set this in Replit/Railway/Render .env
+TOKEN = os.environ.get("DISCORD_TOKEN")  # Set this in Render .env
+if TOKEN is None:
+    print("❌ ERROR: DISCORD_TOKEN not found in Environment Variables")
+    exit(1)
+
 SAVE_FILE = "timezones.json"
 
 # --- Bot setup ---
