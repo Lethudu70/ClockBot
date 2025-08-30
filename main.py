@@ -20,7 +20,7 @@ SAVE_FILE = "timezones.json"
 
 # --- Bot setup ---
 intents = discord.Intents.default()
-intents.members = True  # Needed to modify nicknames
+intents.members = True  # Needed to access guild members
 bot = discord.Client(intents=intents)
 tree = app_commands.CommandTree(bot)
 
@@ -54,11 +54,12 @@ async def settimezone(interaction: discord.Interaction, city: str):
             )
             return
 
-        user_timezones[str(interaction.user.id)] = tz.zone
+        uid = str(interaction.user.id)
+        user_timezones[uid] = tz.zone
         save_timezones()
 
-        if str(interaction.user.id) not in original_names:
-            original_names[str(interaction.user.id)] = interaction.user.display_name
+        if uid not in original_names:
+            original_names[uid] = interaction.user.display_name
 
         await interaction.response.send_message(
             f"✅ Timezone saved for {interaction.user.mention}: {tz.zone}", ephemeral=True
@@ -77,7 +78,7 @@ async def unsettimezone(interaction: discord.Interaction):
             if uid in original_names:
                 await interaction.user.edit(nick=original_names[uid])
                 del original_names[uid]
-        except Exception:
+        except discord.Forbidden:
             pass
         await interaction.response.send_message(
             f"🗑️ Timezone removed for {interaction.user.mention}", ephemeral=True
@@ -99,7 +100,6 @@ async def update_nicknames():
                     now = datetime.now(tz)
                     time_str = now.strftime("%H:%M")
 
-                    # Keep full nickname
                     base_name = original_names.get(uid, member.name)
 
                     # Remove old timestamp if present
@@ -111,14 +111,14 @@ async def update_nicknames():
                     if member.display_name != new_nick:
                         await member.edit(nick=new_nick)
                 except discord.Forbidden:
-                    pass
-                except Exception:
-                    pass
+                    print(f"⚠️ Cannot change nickname for {member}")
+                except Exception as e:
+                    print(f"⚠️ Error updating {member}: {e}")
 
 @bot.event
 async def on_ready():
     print(f"✅ Connected as {bot.user}")
-    update_nicknames.start()
+    update_nicknames.start()  # Start the live clock
     await tree.sync()  # Sync slash commands with Discord
 
 bot.run(TOKEN)
