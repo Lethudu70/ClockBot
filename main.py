@@ -1,5 +1,6 @@
 import discord
-from discord.ext import commands, tasks
+from discord import app_commands
+from discord.ext import tasks
 from datetime import datetime
 import pytz
 import json
@@ -9,8 +10,8 @@ import os
 from keep_alive import run
 run()  # Démarre le serveur Flask en arrière-plan
 
-# --- Read token from environment variable ---
-TOKEN = os.environ.get("DISCORD_TOKEN")  # Set this in Render .env
+# --- Token from environment variable ---
+TOKEN = os.environ.get("DISCORD_TOKEN")
 if TOKEN is None:
     print("❌ ERROR: DISCORD_TOKEN not found in Environment Variables")
     exit(1)
@@ -20,7 +21,8 @@ SAVE_FILE = "timezones.json"
 # --- Bot setup ---
 intents = discord.Intents.default()
 intents.members = True  # Needed to modify nicknames
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = discord.Client(intents=intents)
+tree = app_commands.CommandTree(bot)
 
 # --- Load saved timezones ---
 if os.path.exists(SAVE_FILE):
@@ -36,9 +38,9 @@ def save_timezones():
     with open(SAVE_FILE, "w") as f:
         json.dump(user_timezones, f)
 
-# --- Command to set city/timezone ---
-@bot.command()
-async def settimezone(ctx, *, city: str):
+# --- Slash command to set timezone ---
+@tree.command(name="settimezone", description="Set your city/timezone")
+async def settimezone(interaction: discord.Interaction, city: str):
     try:
         tz = None
         for zone in pytz.all_timezones:
@@ -47,35 +49,43 @@ async def settimezone(ctx, *, city: str):
                 break
 
         if not tz:
-            await ctx.send("❌ Timezone not found. Example: Paris, Tokyo, New_York")
+            await interaction.response.send_message(
+                "❌ Timezone not found. Example: Paris, Tokyo, New_York", ephemeral=True
+            )
             return
 
-        user_timezones[str(ctx.author.id)] = tz.zone
+        user_timezones[str(interaction.user.id)] = tz.zone
         save_timezones()
 
-        if str(ctx.author.id) not in original_names:
-            original_names[str(ctx.author.id)] = ctx.author.display_name
+        if str(interaction.user.id) not in original_names:
+            original_names[str(interaction.user.id)] = interaction.user.display_name
 
-        await ctx.send(f"✅ Timezone saved for {ctx.author.mention}: {tz.zone}")
+        await interaction.response.send_message(
+            f"✅ Timezone saved for {interaction.user.mention}: {tz.zone}", ephemeral=True
+        )
     except Exception as e:
-        await ctx.send(f"⚠️ Error: {e}")
+        await interaction.response.send_message(f"⚠️ Error: {e}", ephemeral=True)
 
-# --- Command to remove timezone ---
-@bot.command()
-async def unsettimezone(ctx):
-    uid = str(ctx.author.id)
+# --- Slash command to remove timezone ---
+@tree.command(name="unsettimezone", description="Remove your timezone")
+async def unsettimezone(interaction: discord.Interaction):
+    uid = str(interaction.user.id)
     if uid in user_timezones:
         del user_timezones[uid]
         save_timezones()
         try:
             if uid in original_names:
-                await ctx.author.edit(nick=original_names[uid])
+                await interaction.user.edit(nick=original_names[uid])
                 del original_names[uid]
         except Exception:
             pass
-        await ctx.send(f"🗑️ Timezone removed for {ctx.author.mention}")
+        await interaction.response.send_message(
+            f"🗑️ Timezone removed for {interaction.user.mention}", ephemeral=True
+        )
     else:
-        await ctx.send("⚠️ No timezone set.")
+        await interaction.response.send_message(
+            "⚠️ No timezone set.", ephemeral=True
+        )
 
 # --- Task to update nicknames every minute ---
 @tasks.loop(minutes=1)
@@ -106,5 +116,6 @@ async def update_nicknames():
 async def on_ready():
     print(f"✅ Connected as {bot.user}")
     update_nicknames.start()
+    await tree.sync()  # Sync slash commands with Discord
 
 bot.run(TOKEN)
