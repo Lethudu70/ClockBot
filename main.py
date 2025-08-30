@@ -5,8 +5,12 @@ import pytz
 import json
 import os
 
+# --- Keep-alive ---
+from keep_alive import run
+run()  # Démarre le serveur Flask en arrière-plan
+
 # --- Read token from environment variable ---
-TOKEN = os.environ.get("DISCORD_TOKEN")  # Set this in Replit/Railway .env
+TOKEN = os.environ.get("DISCORD_TOKEN")  # Set this in Replit/Railway/Render .env
 SAVE_FILE = "timezones.json"
 
 # --- Bot setup ---
@@ -27,10 +31,6 @@ original_names = {}
 def save_timezones():
     with open(SAVE_FILE, "w") as f:
         json.dump(user_timezones, f)
-
-# --- Import keep-alive ---
-from keep_alive import run
-run()  # Start Flask server in background
 
 # --- Command to set city/timezone ---
 @bot.command()
