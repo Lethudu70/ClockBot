@@ -6,9 +6,9 @@ import pytz
 import json
 import os
 
-# --- Keep-alive ---
+# --- Keep-alive Flask server ---
 from keep_alive import run
-run()  # Démarre le serveur Flask en arrière-plan
+run()  # Start Flask server in background
 
 # --- Token from environment variable ---
 TOKEN = os.environ.get("DISCORD_TOKEN")
@@ -38,7 +38,7 @@ def save_timezones():
     with open(SAVE_FILE, "w") as f:
         json.dump(user_timezones, f)
 
-# --- Slash command to set timezone ---
+# --- Slash command: set timezone ---
 @tree.command(name="settimezone", description="Set your city/timezone")
 async def settimezone(interaction: discord.Interaction, city: str):
     try:
@@ -66,7 +66,7 @@ async def settimezone(interaction: discord.Interaction, city: str):
     except Exception as e:
         await interaction.response.send_message(f"⚠️ Error: {e}", ephemeral=True)
 
-# --- Slash command to remove timezone ---
+# --- Slash command: unset timezone ---
 @tree.command(name="unsettimezone", description="Remove your timezone")
 async def unsettimezone(interaction: discord.Interaction):
     uid = str(interaction.user.id)
@@ -87,7 +87,7 @@ async def unsettimezone(interaction: discord.Interaction):
             "⚠️ No timezone set.", ephemeral=True
         )
 
-# --- Task to update nicknames every minute ---
+# --- Task: update nicknames every minute ---
 @tasks.loop(minutes=1)
 async def update_nicknames():
     for guild in bot.guilds:
@@ -99,12 +99,15 @@ async def update_nicknames():
                     now = datetime.now(tz)
                     time_str = now.strftime("%H:%M")
 
+                    # Keep full nickname
                     base_name = original_names.get(uid, member.name)
 
+                    # Remove old timestamp if present
                     if "[" in base_name and "]" in base_name:
                         base_name = base_name.split("[")[0].strip()
 
                     new_nick = f"{base_name} [{time_str}]"
+
                     if member.display_name != new_nick:
                         await member.edit(nick=new_nick)
                 except discord.Forbidden:
